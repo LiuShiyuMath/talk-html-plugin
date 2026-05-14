@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<!-- talk-html-meta {"session_id":"fcd78bc1-e07e-4fa3-b4b1-9fb651d2d043","job_dir":"/Users/m1/.claude/jobs/fcd78bc1","branch":null,"prompt_summary":"talk-html 技能的 GitHub Pages 分享落地页：介绍能力、给出带醒目复制按钮的一行安装命令。","template":"pitch","generated_at":"2026-05-14T05:10:03Z"} -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>talk-html · 用 HTML 说话，不要用聊天滚动条</title>
+<meta name="description" content="一个 Claude Code 技能：把 agent 的长回答变成一页可分享的 HTML，本地预览、发布留存、随时回看。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,500;9..144,600;9..144,700&family=Noto+Serif+SC:wght@400;500;600;700;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4ede0;
+    --paper-deep: #ebe2d0;
+    --ink: #1a1815;
+    --ink-soft: #2b2823;
+    --muted: #6b6660;
+    --rule: #c9bfa9;
+    --teal: #1f4e54;
+    --teal-soft: #2f6770;
+    --terra: #a04830;
+    --terra-soft: #b65c40;
+    --gold: #a08a5c;
+    --term-bg: #211e1a;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--paper); scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% 0%, rgba(255,250,235,0.65) 0%, transparent 70%),
+      var(--paper);
+    color: var(--ink);
+    font-family: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+    font-size: 17px;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0.035; z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='1'/></svg>");
+  }
+  .page {
+    position: relative; z-index: 1;
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 7rem;
+  }
+  /* 报头 */
+  .masthead {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.75rem 0 0.6rem;
+    margin-bottom: 3rem;
+    font: 500 0.7rem/1 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .masthead .dot { color: var(--terra); }
+  /* Hero */
+  h1 {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 700;
+    font-size: clamp(2.3rem, 6vw, 3.3rem);
+    line-height: 1.25;
+    margin: 0 0 1.2rem;
+    color: var(--ink);
+    letter-spacing: -0.005em;
+  }
+  h1 .hl {
+    color: var(--terra);
+    position: relative; white-space: nowrap;
+  }
+  h1 .hl::after {
+    content: '';
+    position: absolute; left: 0; right: 0; bottom: -0.1em;
+    height: 0.18em; background: var(--terra);
+    opacity: 0.18; border-radius: 2px; z-index: -1;
+  }
+  .lede {
+    font-size: 1.14rem;
+    line-height: 1.8;
+    color: var(--ink-soft);
+    max-width: 34rem;
+    margin: 0 0 2.4rem;
+  }
+  .lede em { font-style: normal; color: var(--terra); font-weight: 500; }
+  /* 安装 CTA 卡片 —— 页面的主角 */
+  .install {
+    margin: 2.5rem 0 3.5rem;
+  }
+  .install-label {
+    display: inline-block;
+    font: 700 0.7rem/1 'JetBrains Mono', monospace;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--paper);
+    background: var(--terra);
+    padding: 0.4rem 0.7rem;
+    border-radius: 3px 3px 0 0;
+  }
+  .install-cmd {
+    display: flex;
+    align-items: stretch;
+    background: var(--term-bg);
+    border-radius: 0 4px 4px 4px;
+    overflow: hidden;
+    box-shadow: 0 6px 24px rgba(33,30,26,0.22);
+  }
+  .install-cmd code {
+    flex: 1;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #e8e2d2;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    white-space: nowrap;
+    display: flex; align-items: center;
+  }
+  .install-cmd code::before {
+    content: '$';
+    color: var(--gold);
+    margin-right: 0.6rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .copy-btn {
+    flex-shrink: 0;
+    border: none;
+    background: var(--teal);
+    color: #fdfaf3;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0 1.5rem;
+    cursor: pointer;
+    transition: background 0.18s ease, transform 0.06s ease;
+    letter-spacing: 0.04em;
+    min-width: 5.5rem;
+  }
+  .copy-btn:hover { background: var(--teal-soft); }
+  .copy-btn:active { transform: scale(0.97); }
+  .copy-btn.done { background: #4a7a3c; }
+  .install-note {
+    font-size: 0.86rem;
+    color: var(--muted);
+    margin-top: 0.7rem;
+    line-height: 1.7;
+  }
+  .install-note code {
+    background: var(--paper-deep);
+    padding: 0.06em 0.36em;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    color: var(--ink-soft);
+  }
+  /* 章节 */
+  section { margin: 3.8rem 0; }
+  .eyebrow {
+    font: 600 0.72rem/1 'JetBrains Mono', monospace;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--terra);
+    margin-bottom: 0.55rem;
+  }
+  h2 {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.4;
+    margin: 0 0 1rem;
+    color: var(--ink);
+  }
+  p { margin: 0 0 1rem; }
+  p strong { color: var(--ink); font-weight: 600; }
+  .solve { color: var(--teal); font-weight: 600; }
+  a { color: var(--teal); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+  a:hover { color: var(--terra); }
+  /* 价值三点 */
+  .values {
+    list-style: none;
+    margin: 1.2rem 0 0;
+    padding: 0;
+  }
+  .values li {
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    gap: 0.9rem;
+    align-items: baseline;
+  }
+  .values li:last-child { border-bottom: none; }
+  .values .k {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--terra);
+    flex-shrink: 0;
+    width: 1.6rem;
+    font-variation-settings: "opsz" 40;
+  }
+  .values .v strong { color: var(--ink); font-weight: 600; }
+  .values .v { font-size: 0.98rem; }
+  /* SVG 流程图 */
+  .flow { margin: 1.6rem 0 0.8rem; }
+  .flow svg { width: 100%; height: auto; display: block; }
+  .flow-cap {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 0.4rem;
+    letter-spacing: 0.04em;
+  }
+  /* 触发词 */
+  .triggers {
+    margin: 1rem 0 0;
+    padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 1.4rem;
+    font-size: 0.92rem;
+  }
+  .triggers li {
+    break-inside: avoid;
+    padding: 0.24rem 0;
+    color: var(--ink-soft);
+  }
+  .triggers li::before {
+    content: '·'; color: var(--terra);
+    margin-right: 0.4rem; font-weight: 700;
+  }
+  .triggers li.en {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+  .triggers li.en::before { content: '/'; }
+  /* 文件树 */
+  .tree {
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    padding: 1rem 1.2rem;
+    font: 500 0.78rem/1.85 'JetBrains Mono', monospace;
+    color: var(--ink-soft);
+    margin: 1.2rem 0 0;
+    border-radius: 3px;
+    overflow-x: auto;
+  }
+  .tree .dim { color: var(--muted); font-family: 'Noto Serif SC', serif; font-size: 0.92em; }
+  .tree .name { color: var(--teal); font-weight: 700; }
+  /* 收束横幅 + 第二个 CTA */
+  .closing {
+    margin: 5rem -1.5rem 0;
+    padding: 3rem 2rem 3.2rem;
+    background: var(--teal);
+    color: var(--paper);
+    text-align: center;
+  }
+  .closing h3 {
+    font-family: 'Noto Serif SC', serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    line-height: 1.55;
+    margin: 0 0 1.4rem;
+    color: #fdfaf3;
+    letter-spacing: 0.02em;
+  }
+  .closing h3 em { color: var(--gold); font-style: normal; font-weight: 500; }
+  .closing .install-cmd {
+    text-align: left;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.3);
+  }
+  .closing-note {
+    font-size: 0.85rem;
+    color: rgba(253,250,243,0.7);
+    margin-top: 0.9rem;
+  }
+  .closing-note a { color: var(--gold); }
+  /* 页脚 */
+  footer.tlh-foot {
+    margin-top: 3rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font: 500 0.74rem/1.7 'JetBrains Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+  footer.tlh-foot a { color: var(--teal); text-decoration: none; }
+  footer.tlh-foot a:hover { color: var(--terra); text-decoration: underline; }
+  /* Audit pill */
+  .tlh-pill {
+    position: fixed; bottom: 1rem; right: 1rem;
+    font: 500 11px/1.4 'JetBrains Mono', ui-monospace, monospace;
+    background: rgba(26,24,21,0.92);
+    color: #f4ede0;
+    padding: 7px 11px;
+    border-radius: 999px;
+    display: inline-flex; gap: 9px; align-items: center;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.22);
+    user-select: none; cursor: pointer;
+    z-index: 2147483647;
+    letter-spacing: 0.04em;
+    backdrop-filter: blur(4px);
+  }
+  .tlh-pill .lbl { opacity: 0.55; }
+  .tlh-pill .id { color: var(--gold); }
+  .tlh-pill a {
+    color: inherit; text-decoration: none; opacity: 0.65;
+    padding-left: 4px; border-left: 1px solid rgba(244,237,224,0.25);
+  }
+  .tlh-pill a:hover { opacity: 1; color: var(--gold); }
+  .tlh-pill.copied .id::after { content: ' ✓'; color: #9bbf68; }
+  /* 移动端 */
+  @media (max-width: 480px) {
+    .page { padding: 2.5rem 1.1rem 7rem; }
+    h1 { font-size: 2rem; }
+    .lede { font-size: 1.04rem; }
+    h2 { font-size: 1.3rem; }
+    .triggers { columns: 1; }
+    .install-cmd { flex-direction: column; }
+    .install-cmd code { white-space: pre-wrap; word-break: break-all; }
+    .copy-btn { padding: 0.7rem 0; width: 100%; }
+    .closing { margin: 4rem -1.1rem 0; padding: 2.4rem 1.3rem; }
+    .masthead { font-size: 0.6rem; flex-wrap: wrap; gap: 0.4rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+
+<main class="page">
+
+  <header class="masthead">
+    <span>talk-html <span class="dot">·</span> 一个 Claude Code 技能</span>
+    <span>2026-05-14</span>
+  </header>
+
+  <h1>用 HTML 说话，<br><span class="hl">不要用聊天滚动条</span>。</h1>
+
+  <p class="lede">
+    <strong>talk-html</strong> 是一个 Claude Code 技能。它把 agent 的长回答变成<em>一页打磨过的 HTML</em>——本地先预览，发布后留存，几周后还能凭一个关键词找回来。装一次，之后在对话里说一句"做成一页"就够了。
+  </p>
+
+  <!-- ===== 主 CTA：带复制按钮的安装命令 ===== -->
+  <div class="install">
+    <span class="install-label">一行装好</span>
+    <div class="install-cmd">
+      <code id="cmd">curl -fsSL https://raw.githubusercontent.com/LiuShiyuMath/talk-html-skill/main/install.sh | bash</code>
+      <button class="copy-btn" type="button"
+        onclick="var b=this;navigator.clipboard.writeText(document.getElementById('cmd').textContent).then(function(){b.textContent='已复制 ✓';b.classList.add('done');setTimeout(function(){b.textContent='复制';b.classList.remove('done');},1600);},function(){b.textContent='复制失败';setTimeout(function(){b.textContent='复制';},1600);});">复制</button>
+    </div>
+    <p class="install-note">
+      装进 <code>~/.claude/skills/talk-html/</code>。装好后在 Claude Code 里用 <code>/talk-html</code> 唤起，或直接说"用 html 解释一下"。
+    </p>
+  </div>
+
+  <!-- ===== 它解决什么 ===== -->
+  <section>
+    <div class="eyebrow">Why</div>
+    <h2>它解决一个具体的麻烦。</h2>
+    <p>
+      并行开着好几个 Claude 会话时，agent 产出的 HTML 一份份散落在 <code>~/.claude/jobs/</code>、worktree、<code>/tmp</code> 里。每份刚做出来都有用，隔几天就忘了从哪儿来。talk-html 把三件事收进一个技能：
+    </p>
+    <ul class="values">
+      <li>
+        <span class="k">一</span>
+        <span class="v"><strong>沟通。</strong>把长回答渲染成有版式、能读的一页 HTML，而不是让人在聊天框里上下翻。</span>
+      </li>
+      <li>
+        <span class="k">二</span>
+        <span class="v"><strong>留存。</strong>本地预览满意后，一键发布到 gist（或像这一页一样发到 GitHub Pages），拿到可分享的链接。</span>
+      </li>
+      <li>
+        <span class="k">三</span>
+        <span class="v"><strong>回看。</strong>每份产出都进一个本地索引，凭关键词就能翻出来——这是大多数技能会忘掉的那一件。</span>
+      </li>
+    </ul>
+  </section>
+
+  <!-- ===== 流程 ===== -->
+  <section>
+    <div class="eyebrow">How it works</div>
+    <h2>整条路径一句话讲完。</h2>
+    <p>本地生成 → 浏览器预览 → 跟你确认 → 发布留存 → 写进索引。几周后用一个词找回来。</p>
+    <div class="flow" aria-label="talk-html 流程图">
+      <svg viewBox="0 0 600 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="flow-title">
+        <title id="flow-title">从话题到可分享链接的流程</title>
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#1f4e54"/>
+          </marker>
+          <marker id="arr-t" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#a04830"/>
+          </marker>
+        </defs>
+        <g font-family="Noto Serif SC, serif" font-size="12" fill="#1a1815" text-anchor="middle">
+          <g>
+            <rect x="12" y="34" width="92" height="42" rx="3" fill="#ebe2d0" stroke="#a04830" stroke-width="1.5"/>
+            <text x="58" y="52" font-weight="600">话题</text>
+            <text x="58" y="68" fill="#6b6660" font-size="9.5" font-family="JetBrains Mono, monospace">conversation</text>
+          </g>
+          <g>
+            <rect x="134" y="34" width="92" height="42" rx="3" fill="#ebe2d0" stroke="#1f4e54" stroke-width="1.5"/>
+            <text x="180" y="52" font-weight="600">生成 HTML</text>
+            <text x="180" y="68" fill="#6b6660" font-size="9.5" font-family="JetBrains Mono, monospace">本地文件</text>
+          </g>
+          <g>
+            <rect x="256" y="34" width="92" height="42" rx="3" fill="#ebe2d0" stroke="#1f4e54" stroke-width="1.5"/>
+            <text x="302" y="52" font-weight="600">预览确认</text>
+            <text x="302" y="68" fill="#6b6660" font-size="9.5" font-family="JetBrains Mono, monospace">open + y/n/e</text>
+          </g>
+          <g>
+            <rect x="378" y="34" width="92" height="42" rx="3" fill="#1f4e54" stroke="#1f4e54" stroke-width="1.5"/>
+            <text x="424" y="52" font-weight="600" fill="#f4ede0">发布留存</text>
+            <text x="424" y="68" fill="#a08a5c" font-size="9.5" font-family="JetBrains Mono, monospace">gist / pages</text>
+          </g>
+          <g>
+            <rect x="500" y="34" width="92" height="42" rx="3" fill="#a04830" stroke="#a04830" stroke-width="1.5"/>
+            <text x="546" y="52" font-weight="600" fill="#f4ede0">可分享链接</text>
+            <text x="546" y="68" fill="#ebe2d0" font-size="9.5" font-family="JetBrains Mono, monospace">+ 回看索引</text>
+          </g>
+        </g>
+        <g stroke="#1f4e54" stroke-width="1.5" fill="none" marker-end="url(#arr)">
+          <line x1="106" y1="55" x2="131" y2="55"/>
+          <line x1="228" y1="55" x2="253" y2="55"/>
+          <line x1="350" y1="55" x2="375" y2="55"/>
+        </g>
+        <g stroke="#a04830" stroke-width="1.5" fill="none" marker-end="url(#arr-t)">
+          <line x1="472" y1="55" x2="497" y2="55"/>
+        </g>
+      </svg>
+      <div class="flow-cap">预览那一步不能省——你几乎不想把没自己看过的页面发出去。</div>
+    </div>
+  </section>
+
+  <!-- ===== 怎么唤起 ===== -->
+  <section>
+    <div class="eyebrow">Triggers</div>
+    <h2>装好之后，怎么叫它。</h2>
+    <p>用斜杠命令，或者在对话里直接说下面任意一句。agent 会自己选版式、写 HTML、在浏览器里打开，等你点头：</p>
+    <ul class="triggers">
+      <li>用 html 解释</li>
+      <li>用 html 说</li>
+      <li>做个网页</li>
+      <li>做成一页</li>
+      <li>推到 gist</li>
+      <li>html 回看</li>
+      <li>html 备忘</li>
+      <li>解释给＜人＞看</li>
+      <li class="en">/talk-html</li>
+      <li class="en">talk in html</li>
+      <li class="en">make a page out of this</li>
+      <li class="en">give me an html version</li>
+    </ul>
+  </section>
+
+  <!-- ===== 装好之后有什么 ===== -->
+  <section>
+    <div class="eyebrow">What you get</div>
+    <h2>四个文件，各做一件事。</h2>
+    <div class="tree">
+<span class="dim">~/.claude/skills/</span><span class="name">talk-html/</span>
+├── SKILL.md              <span class="dim"># agent 读的工作流与质量标准</span>
+├── publish.sh            <span class="dim"># 发布到 gist + 写回看索引</span>
+├── recall.sh             <span class="dim"># 列出 / 按关键词打开旧产出</span>
+└── templates/
+    └── skeleton.html     <span class="dim"># 必备结构槽位（不规定视觉）</span>
+    </div>
+    <p style="margin-top:1.2rem;">
+      产出统一落在 <code>~/.claude/talk-html/</code>，旁边的 <code>index.jsonl</code> 每发布一份记一行。想找回某一页，跑 <span class="solve">recall.sh ＜关键词＞</span> 就在浏览器里打开了。
+    </p>
+  </section>
+
+  <footer class="tlh-foot">
+    本页由 talk-html 自己生成 · Claude session
+    <a href="file:///Users/m1/.claude/projects/-Users-m1-projects-metrixMarketdoc/fcd78bc1-e07e-4fa3-b4b1-9fb651d2d043.jsonl" title="打开会话日志"><code>fcd78bc1</code></a>
+    · 2026-05-14 · <code>pitch</code> 模板 · 仓库 <a href="https://github.com/LiuShiyuMath/talk-html-skill">github.com/LiuShiyuMath/talk-html-skill</a>
+  </footer>
+
+</main>
+
+<!-- ===== 收束 + 第二个 CTA ===== -->
+<div class="closing">
+  <h3>装一次，之后只说<em>"做成一页"</em>。</h3>
+  <div class="install">
+    <div class="install-cmd">
+      <code id="cmd2">curl -fsSL https://raw.githubusercontent.com/LiuShiyuMath/talk-html-skill/main/install.sh | bash</code>
+      <button class="copy-btn" type="button"
+        onclick="var b=this;navigator.clipboard.writeText(document.getElementById('cmd2').textContent).then(function(){b.textContent='已复制 ✓';b.classList.add('done');setTimeout(function(){b.textContent='复制';b.classList.remove('done');},1600);},function(){b.textContent='复制失败';setTimeout(function(){b.textContent='复制';},1600);});">复制</button>
+    </div>
+  </div>
+  <p class="closing-note">
+    源码与 install.sh：<a href="https://github.com/LiuShiyuMath/talk-html-skill">github.com/LiuShiyuMath/talk-html-skill</a>
+  </p>
+</div>
+
+<div class="tlh-pill" id="auditPill"
+     title="session fcd78bc1-e07e-4fa3-b4b1-9fb651d2d043 · 生成于 2026-05-14T05:10:03Z · 点击复制 id"
+     onclick="var p=this;navigator.clipboard&amp;&amp;navigator.clipboard.writeText('fcd78bc1-e07e-4fa3-b4b1-9fb651d2d043').then(function(){p.classList.add('copied');setTimeout(function(){p.classList.remove('copied');},1400);});">
+  <span class="lbl">session</span>
+  <span class="id">fcd78bc1</span>
+  <a href="file:///Users/m1/.claude/projects/-Users-m1-projects-metrixMarketdoc/fcd78bc1-e07e-4fa3-b4b1-9fb651d2d043.jsonl"
+     onclick="event.stopPropagation();"
+     aria-label="打开会话日志">↗</a>
+</div>
+
+</body>
+</html>
