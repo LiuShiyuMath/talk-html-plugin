@@ -28,7 +28,7 @@ gh auth status >/dev/null 2>&1 || {
 
 SLUG="$(basename "$HTML" .html)"
 DESC="talk-html: $SLUG"
-INDEX="$HOME/.claude/talk-html/index.jsonl"
+INDEX="$HOME/.agents/talk-html/index.jsonl"
 mkdir -p "$(dirname "$INDEX")"
 
 # push with up to 3 retries for transient 5xx
