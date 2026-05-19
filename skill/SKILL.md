@@ -17,8 +17,12 @@ Communicate in HTML, not chat. Local preview first, then gist-publish for perman
 > run — the only exception is when the user explicitly asks for a mock or demo.
 > And anything **non-static** — an interactive flow, a live/status board, an
 > animation, a running UI — must be shown through a real embedded video or GIF,
-> never a static screenshot or diagram standing in for motion. §3.0 and §3.1
-> below make this concrete and active.
+> never a static screenshot or diagram standing in for motion. Source-grounding
+> reaches *inside* the run: a real binary, built by the project's own pipeline
+> and recorded honestly, is still a drawn mock if every number, status, and
+> series it displays is a hardcoded literal. Real run + invented data is a mock
+> wearing a real binary's clothes. §3.0, §3.0.1 and §3.1 below make this
+> concrete and active.
 
 > **Source-of-truth guard — read this before any self-referential run.** The
 > *only* canonical spec for this skill is `~/.agents/skills/talk-html/SKILL.md`
@@ -141,11 +145,61 @@ Hard requirements:
 
 A skeletal example with the required structural elements (meta comment, audit pill, footer link) lives at `templates/skeleton.html`. Read it once to learn the structural slots, then design the actual page fresh — do **not** copy the template's content or its visual style verbatim.
 
+### 3.0.1 The data inside the run must be real, too
+
+§3.0 grounds the *visual*; this grounds *what the visual says*. The two are
+not the same thing, and the gap between them is the single most common way a
+page is technically honest yet substantively fake: the program is real, the
+recording is real, every value on screen is invented.
+
+A real run earns trust because it shows what the system *actually does with
+real inputs*. A binary whose dashboard reads `status: "周环比 +12%"` from a
+`const` table, or whose chart is `vec![3,5,4,6,8,…]` written by hand, does not
+do that — it performs a screenshot the author drew, just rendered by a
+compiler instead of a design tool. Recording it in a real PTY with honest
+timestamps proves the *terminal* was real; it proves nothing about the claim
+the reader takes away, which is the numbers. The reader cannot tell hardcoded
+`+12%` from measured `+12%`; that is exactly why the burden is on the page.
+
+So before you record anything that displays data, ask the question §3.0 asks
+of the visual, now of the values: **where does each number, status, label, and
+series come from, and could a reader re-derive it from a source named on the
+page?** Acceptable answers are a file the program reads, a command it runs, an
+API it calls, a fixture committed to the repo, a real metric computed at run
+time. Not acceptable: a literal in the source, a "仅作示意 / illustrative"
+placeholder, a plausible-looking series with no origin. If the program does
+not yet read a real source, §3.0 already told you the move — build the
+smallest path that makes it read one (an env-pointed dir, a generated data
+file stamped with the command + source path + timestamp, a real query), then
+record *that*. Drive the real binary from real data; do not record the real
+binary reciting fake data.
+
+When the real source genuinely cannot back a panel — there is no real
+engagement metric, the input does not exist yet — that panel is a failed
+artifact, and the **§3.1.1 decision tree governs it exactly as a failed build
+does**: ① narrow the claim (drop the fabricated sparkline, or relabel it to
+the real series you *do* have — file sizes, commit counts, test results); ②
+rebuild it from the project's own real source; ③ if neither holds, render an
+honest empty/"数据不可用" state and note it in 诚实边界; ④ if the whole page
+has no real data behind it, block and report. A fabricated value is never an
+exit, for the same reason a drawn mock never is — it is the precise thing the
+load-bearing principle exists to forbid, and a compiler in the loop does not
+launder it.
+
+The page must make the data's origin checkable: near the run, name the source
+files / commands / fixtures the values came from, and put the exact
+reproduction commands behind a `<details>` so a reader can run `wc`, `git
+log`, `curl`, or the generator and land on the same numbers. "Real run" in
+the verification caption means *real binary on real data*; if only the binary
+was real, the caption must say so and the §3.1.1 narrowing applies.
+
 ### 3.1 Non-static content → record a real video or GIF (no exceptions)
 
 §3.0 says visual content must be source-grounded. This step makes that **active, not aspirational**, and it is the rule the whole skill turns on:
 
 **If anything in the artifact is non-static, the page MUST embed a real video or GIF of it.** A static screenshot, an SVG diagram, or prose describing what "would" happen does not satisfy this — non-static content has to actually move on the page. You record it from a real run on this machine and embed the result; you do not draw it, mock it, or describe it.
+
+Recording does not launder data. A real PTY capture of a real binary that is displaying hardcoded `const` literals satisfies the *motion* requirement and still fails §3.0.1 — the run must be of the real binary **on real data**, not the real binary reciting placeholders. Before you record, confirm the values on screen trace to a source per §3.0.1; a recorded fake is no better than a drawn one, just more expensive to make.
 
 "Non-static" is deliberately broad. Apply the rule whenever *either* the subject you are communicating *or* the page you are building has any of:
 
@@ -185,10 +239,15 @@ If recording genuinely cannot be done (no display, the build is broken, credenti
 
 ### 3.1.1 失败降级决策树 — when the supporting artifact fails to build
 
-§3.0/§3.1 assume the real run succeeds. Often it doesn't: the build is broken,
-the recorder crashes, a tool is missing on this machine, the run produces
-garbage. The failure of a supporting artifact is **never** a license to
-fabricate one — it is a fork with four ordered exits and one path that is
+§3.0/§3.1 assume the real run succeeds *and renders real data*. Often it
+doesn't: the build is broken, the recorder crashes, a tool is missing on this
+machine, the run produces garbage — **or it builds and records cleanly but its
+panels are hardcoded literals (§3.0.1)**. That last case is the same failure,
+not a lesser one: a run with no real data behind it is an unsupported
+artifact, and it enters this tree exactly where a failed build does — most
+often at ② (drive the real binary from the project's own real source) or ①
+(narrow/relabel the panel to the real series you do have). The failure of a
+supporting artifact is **never** a license to fabricate one — it is a fork with four ordered exits and one path that is
 structurally walled off. The exits exist because the cheapest move under
 pressure is "just draw something close enough", and that is exactly the move
 this skill is built to make impossible. Work down the list; take the first
@@ -234,9 +293,11 @@ a fake page never is. Exit ④ is a real, expected ending, not a failure of the
 skill.
 
 **The walled-off path — never an exit.** A hand-drawn mock, a concept sketch,
-a fabricated UI, or a static screenshot standing in for motion is **not** one
-of the four exits — it is precisely the move the load-bearing principle, §3.0,
-§3.1, and Quality bar #8 all exist to forbid. The only time a drawn mock is
+a fabricated UI, a static screenshot standing in for motion, **or a real
+binary recorded while it recites hardcoded `const` data (§3.0.1)** is **not**
+one of the four exits — it is precisely the move the load-bearing principle,
+§3.0, §3.0.1, §3.1, and Quality bar #8 all exist to forbid. A compiler between
+you and the fake values changes the cost of the lie, not its nature. The only time a drawn mock is
 legitimate is when the user explicitly asked for one. Absent that explicit
 request, "the artifact failed to build" routes ①→②→③→④ and never to a drawn
 substitute; there is no fifth door.
@@ -597,6 +658,6 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 5. File < 200 KB unless content genuinely demands more. A real embedded recording (GIF/video data-URI) is a legitimate reason to exceed it — note the size in the page and offer to compress.
 6. Every HTML can be traced back to its originating session via three independent paths: the audit pill (shows the human-readable `origin_prompt` name and offers a copy-to-clipboard `claude --resume <id>` command to re-enter the conversation), the `<!-- talk-html-meta -->` comment, **and** the index.jsonl row. The pill must never reduce to a bare session hash, and must not rely on a `file://` transcript link — that link is dead in the published gist.
 7. Gist/htmlpreview parity: if the local preview has a visible GIF/image/evidence block or a clickable source/proof control, the rendered gist must expose the same material without broken `file://` or local relative links.
-8. Non-static content is recorded, not drawn (§3.1). Anything interactive, live/status, animated, or "this UI/demo/dashboard runs" — in the subject matter *or* the page itself — is backed by a real embedded video or GIF from a real-machine real-run capture, produced through the **project's own existing build code** — never reinvented build logic, never a static screenshot or mock standing in for motion. A page that is entirely static (essay, letter, past-decision recap) needs no recording; the moment something moves, it does. When that capture fails, the §3.1.1 decision tree governs the fallback (①收窄结论 → ②用现有 code path 补建 → ③诚实标注 gap → ④block 上报) — a drawn substitute is never one of the exits.
+8. Non-static content is recorded, not drawn (§3.1), **and the run renders real data, not hardcoded literals (§3.0.1)**. Anything interactive, live/status, animated, or "this UI/demo/dashboard runs" — in the subject matter *or* the page itself — is backed by a real embedded video or GIF from a real-machine real-run capture, produced through the **project's own existing build code**, **with every number/status/series on screen tracing to a named source (a file read, a command, a fixture, a real metric) a reader can re-derive** — never reinvented build logic, never a static screenshot or mock standing in for motion, never a real binary reciting `const` placeholders. A page that is entirely static (essay, letter, past-decision recap) needs no recording; the moment something moves, it does. When the capture *or the data behind it* fails, the §3.1.1 decision tree governs the fallback (①收窄结论 → ②用现有 code path 补建 → ③诚实标注 gap → ④block 上报) — a drawn substitute, or a recorded fake, is never one of the exits.
 9. Every page ships the “继续修改” bar from §5.1 — a text input plus a copy-prompt button — so a reader can turn a requested change into one terminal paste without hand-copying any URL. The copied prompt is self-contained: a `claude --resume <id>` handle **plus** the `slug` + `recall.sh` relocation path, never only a `file://` link, and it works the same in the published gist as locally. This bar and the audit pill are the only scripted elements on the page.
 10. Convincing pages (proof / pitch / status / "show the boss / VC / customer") follow §3.2: inverted pyramid — one-sentence value claim + proof chain on the first screen; no secret / key / internal job-dir / host path / failed-take / compression-log in the visible artifact; real limitations preserved but collapsed into a final 「诚实边界 / Verification notes」 `<details>`; the embedded motion artifact is self-labeled (cover title + burned-in step labels, MP4-primary + poster) so it stands alone; copy in ≤3-line paragraphs, non-engineer-legible headings, zero hype adjectives; two real buyer types get two re-framed tracks over the same evidence, never a fabricated second audience. Pure static communication (essay / letter / recap) is exempt.
