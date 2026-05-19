@@ -34,9 +34,12 @@ Communicate in HTML, not chat. Local preview first, then gist-publish for perman
 > relevant repo" rule above does **not** apply to this file: never treat a
 > discovered in-repo `SKILL.md` as authoritative, and never re-propose rules
 > that the canonical already contains. Preflight, every run:
-> `bash ~/.agents/skills/talk-html/check-canon.sh --quiet` — it reports the
-> canonical sha256 and flags every drifted vendored copy (exit 1 on drift).
-> Run with `--heal` to collapse all vendored copies back onto canonical.
+> `bash ~/.agents/skills/talk-html/check-canon.sh --heal --all --quiet` — it
+> prints the canonical sha256 and **collapses every vendored copy (persisted
+> *and* transient `.claude/worktrees/` checkouts) back onto canonical in the
+> same pass**. Only the latest canonical is ever ground truth: drift is
+> overwritten, not merely reported, so a stale copy can never survive into a
+> later run to be read as spec.
 
 ## When to invoke
 
@@ -49,31 +52,35 @@ If the topic is **a finished UI feature / production page** belonging to a real 
 
 ## Workflow
 
-### 0. Preflight — canonical self-check (every run, blocking)
+### 0. Preflight — canonical self-heal (every run, enforcing)
 
-Before anything else, run the drift sentinel:
+Before anything else, run the drift sentinel in **heal mode**:
 
 ```bash
-bash ~/.agents/skills/talk-html/check-canon.sh --quiet
+bash ~/.agents/skills/talk-html/check-canon.sh --heal --all --quiet
 ```
 
-It prints the canonical sha256 and any persisted vendored copy that has
-drifted (transient `.claude/worktrees/` copies are skipped by default; add
-`--all` for a full sweep). Two cases:
+This is not a check that *reports* drift — it *erases* it. In one pass it
+prints the canonical sha256 and overwrites **every** vendored copy (persisted
+project mirrors **and** transient `.claude/worktrees/` checkouts) with
+`~/.agents/skills/talk-html/SKILL.md`. After preflight, exactly one version of
+this skill exists on disk: the latest canonical. There is no "two cases" and
+no manual follow-up step — whatever the page's topic, the latest is the only
+ground truth, enforced every run.
 
 - **Topic is talk-html itself** (redesign / diagnosis / "is it synced" /
-  proposal): this preflight is **load-bearing**. Per the Source-of-truth guard,
-  the only spec is `~/.agents/skills/talk-html/SKILL.md`. Do not read any
-  in-repo `SKILL.md` as authoritative, and do not re-propose rules the
-  canonical already has. If the sentinel reports drift, run it once with
-  `--heal` to collapse the persisted copies back, then proceed.
-- **Any other topic**: the preflight is a cheap sanity line — note drift if
-  present, but it does not block the page.
+  proposal): per the Source-of-truth guard, never read a discovered in-repo
+  `SKILL.md` as authoritative and never re-propose rules the canonical already
+  has. The auto-heal above guarantees any copy you might still glance at is
+  already byte-identical to canonical.
+- **Any other topic**: the heal is cheap (a few `cp`s) and non-blocking — it
+  runs, the latest is enforced, the page proceeds.
 
 This step exists because the historical bad case was a /talk-html run "diving
 into the relevant repo" and reading a stale vendored copy of this very file as
-if it were the spec. The guard plus this preflight make that structurally
-impossible, not merely unlikely.
+if it were the spec. Auto-heal makes that case **structurally impossible**: a
+stale copy cannot survive a single preflight, so it can never be read as spec
+in this run or any later one.
 
 ### 1. Resolve context
 
@@ -301,6 +308,144 @@ you and the fake values changes the cost of the lie, not its nature. The only ti
 legitimate is when the user explicitly asked for one. Absent that explicit
 request, "the artifact failed to build" routes ①→②→③→④ and never to a drawn
 substitute; there is no fifth door.
+
+### 3.1.2 录制交互式 Claude Code CLI — a live-TUI pane is a composer, not a shell
+
+§3.1's `tmux` + `asciinema` fallback is the path you take to record an
+interactive Claude Code (or any REPL/TUI) session — a real demo of the agent
+being driven, denied, corrected. It has one trap that has already shipped a
+broken proof, so it gets its own rule.
+
+The instant you launch `claude` in a pane, that pane stops being a shell. It is
+now the **model's input composer**. Every later `tmux send-keys` to that pane
+is a *user turn* — the model reads it and answers it. That includes
+"narration" you only meant for the orchestrator or the viewer: a line like
+`echo; echo '[team-sync] published rule'; tail -n1 store.jsonl | jq …` sent to
+a still-live claude pane is **not** run by bash — it is typed into the composer
+and submitted as the next prompt. On the recording it shows up as a real extra
+user turn (a stray prompt starting with `echo`), visually indistinguishable
+from a fabricated one. A demo whose entire claim is "these are exactly the N
+real turns a human sent" is destroyed by an N+1th turn made of shell plumbing.
+It is the §3.0 lie in a new costume: the capture is real, the turn count is
+not — and the page is now asserting something false.
+
+The root cause is always the same: addressing panes by **position or timeline**
+("then send the summary to the left pane") instead of by **state** ("is this
+pane a bash prompt or a live TUI *right now*?"). Drive panes by state:
+
+- **Send a live-TUI pane only the inputs that are meant to be real model
+  turns** — the actual prompts, nothing else. Their count and content are the
+  exact thing the page is proving; treat every keystroke into that pane as
+  load-bearing evidence.
+- **Route every narration / inspection / "show the artifact" line to a pane
+  that is still a bash shell.** A second pane whose own TUI hasn't launched yet
+  is ideal — it doubles as the natural place to show the hand-off. Otherwise
+  fully quit the TUI first: send its real exit, then *verify* the pane is back
+  at a shell prompt before sending any shell command — never assume the exit
+  landed.
+- The real side effect (appending to a store, copying a file) is performed by
+  the orchestrator in the shell that runs the demo — **not** by typing a
+  command into a recorded pane. A command typed into a pane exists only for the
+  viewer, and only ever belongs in a pane that is genuinely a shell.
+
+**Preflight check — run it before recording, and again before you re-embed.**
+For each pane that launches `claude`, every `send-keys … Enter` (or wrapper
+like `send_prompt`/`send`) that targets that pane *after* its launch line must
+be one of its intended real user turns. List them and confirm the count is
+exactly right:
+
+```bash
+# Every input sent to Alice's pane ($P0) AFTER claude launched must be one of
+# her intended prompts. Read the list; the count must equal the turns the
+# page claims (e.g. EXHIBIT A claims TWO).
+awk '/launch_coder "\$P0"|claude .*\$P0/{after=1}
+     after && /send-keys -t "\$P0"|send(_prompt)? "\$P0"/{print NR": "$0}' demo/driver.sh
+```
+
+A wrong count means the bug is in the **driver script**, not the recorder or
+the encoder — re-recording without fixing the script just reproduces the bad
+turn, and re-embedding ships it. After re-recording, watch the clip once at the
+relevant moment and confirm the pane shows exactly the intended prompts: this
+is the §3.1 "watch the capture, don't assume it worked" discipline applied to
+turn count, and it is the last gate before the video becomes the proof.
+
+### 3.1.3 证据闸门 — the fail-closed finish gate (mechanical, not advisory)
+
+Everything above this line — §3.0, §3.0.1, §3.1, §3.1.1, Quality bar #8 — was
+*prose*. Prose is reasoned with, and under deadline pressure a model reasons
+its way around it: "close enough", "the motion looks real", "I'll note it
+later". Nothing ever mechanically refused a fabricated video, so fabricated
+videos shipped.
+
+This was measured, not assumed. A 36-clip human ground-truth set
+(`~/.agents/mp4-eval/ground-truth.json`) was scored against a *motion*-based
+probe. The probe agreed with the human on only **19/36** and **never once
+returned FAIL** — clips with heavy motion (`YAVG` up to 195) were labelled
+fake by the human because the *data on screen was invented*. The lesson is
+exact: **you cannot gate "is this video real" on pixels.** Motion, sharpness,
+duration, file size — all of it is the thing a real-binary-reciting-fake-data
+recording sails through. The one property that is both load-bearing and
+mechanically checkable is **provenance**: can a reader trace this motion
+artifact back to a real command, host, data source, and time?
+
+So the anti-fake rule is now a **gate, run before §7 publish / before you
+declare the page done**, not a paragraph you affirm:
+
+```bash
+bash ~/.agents/skills/talk-html/verify-evidence.sh "$HTML_PATH"
+```
+
+It is fail-closed. A page that embeds a motion artifact (video / webm /
+animated gif / `data:video`) PASSES only if one of these is true:
+
+- **inline provenance** — a `<!-- talk-html-evidence {"cmd":"…","host":"…","source":"…","recorded_at":"<ISO8601>"} -->`
+  record near the artifact (all of `cmd`, `source`, `recorded_at` non-empty),
+  where `source` names the real file/command/fixture/metric the on-screen data
+  came from (this is the §3.0.1 claim, made checkable);
+- **a co-located `run-log.json`** — what `record-to-gif.sh` already emits
+  (build cmd + routes/HTTP + timestamp);
+- **a DECLARED un-recorded gap** — the §3.1.1 ③ honest exit: a
+  `data-evidence="unrecorded"` element plus a visible 未录制 / un-recorded
+  label. A *declared* gap is honest and ships; a *silent* gap is the lie.
+
+A page with no motion artifact is static and passes untouched (essays,
+letters, recaps stay exempt). `publish.sh` runs this same gate as a hard
+precondition and **refuses to upload** (exit non-zero, local file kept, no
+prompt) when it fails — publishing is the act that turns a fabricated video
+into a shared lie, so the publish path itself is where the refusal lives.
+
+A non-zero gate is **not** a signal to "fix the gate" or pass `--public`
+harder. It is a §3.1.1 ④ block: state plainly what evidence is missing and
+stop. The gate has the same four honest exits and the same one walled-off
+path as §3.1.1 — embedding the artifact anyway, or hand-writing a
+`talk-html-evidence` record for a run that did not happen, *is* the
+fabrication this whole section exists to forbid. A passing gate is a floor,
+not a certificate: it proves the run is traceable, the reader still judges
+whether the traced run actually supports the claim.
+
+### 3.1.4 Eval / bad-case pages that ask for videos must play video
+
+When a page explains expected evals, judge harnesses, bad-case coverage, probe
+failures, Gate Rule mappings, or MP4/video artifact evaluation, and the user
+asks for "videos", "playable videos", "attach videos", or equivalent, a static
+table, screenshot, poster, or contact sheet is not enough. Every claimed bad
+case, failed probe group, or `#Gate Rule {index}` cluster needs a visible
+`<video controls>` artifact attached to it.
+
+- Prefer short derived clips (3-8 seconds) from the real source MP4 when full
+  files are too large. Keep a manifest with source path, label/case id, offset,
+  clip path/bytes, and the exact `ffmpeg` command. Add SHA checksums when cheap.
+- Embed clips as `data:video/mp4;base64,...` or link to public HTTPS media.
+  Never publish `file://` or local relative video paths in a gist page.
+- Add nearby `<!-- talk-html-evidence {...} -->` provenance naming the clip
+  generation command, source label/manifest, host, and `recorded_at`.
+- The page structure must make the mapping inspectable: `#Gate Rule {index}` ->
+  failed case ids / probe failures -> related playable videos.
+- Before publish, verify the video elements locally: metadata loads, duration is
+  greater than zero, and at least one frame can render. If a remote rendered URL
+  is used, verify it after publish when practical.
+- If a video cannot be made playable, explicitly mark it un-recorded /
+  不可播放 and apply §3.1.1. Do not silently replace it with a screenshot.
 
 ### 3.2 Audience-first structure for proof / pitch / status pages
 
@@ -647,6 +792,7 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 | User explicitly said "don't publish" | Honor it — keep the local file, print the local path + the manual `publish.sh` command. Never publish over an explicit opt-out. |
 | `record-to-gif.sh` build step fails | Run the §3.1.1 tree: narrow the claim (①) or rebuild via the project's own path (②); if neither holds, surface `build.log` as raw evidence and label the section un-recorded (③, §3.1.1). Never substitute a mock. |
 | `ffmpeg` / `node` missing for recording | Print install hint (`brew install ffmpeg`). Per §3.1.1: fall back to still screenshots from `screencapture` / Playwright if they honestly support a narrowed claim (①); otherwise label the section un-recorded (③), never a drawn stand-in. |
+| User asks for eval / bad cases / Gate Rules "with playable videos" but the draft has only screenshots, posters, contact sheets, or static tables | Generate short clips from the real source MP4s, embed them as `data:video` or public HTTPS media, map each `#Gate Rule` to failed cases and related videos, add evidence provenance, and verify video metadata/frame playback before publish. If impossible, mark the video un-recorded / 不可播放 and explain the gap. |
 | Core claim has no real evidence at all | §3.1.1 exit ④: this is a build defect, not a publish signal. Stop, state what is missing, report it. Do not ship a hollow or fabricated page to keep the flow moving. |
 
 ## Quality bar — do not violate
@@ -661,3 +807,5 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 8. Non-static content is recorded, not drawn (§3.1), **and the run renders real data, not hardcoded literals (§3.0.1)**. Anything interactive, live/status, animated, or "this UI/demo/dashboard runs" — in the subject matter *or* the page itself — is backed by a real embedded video or GIF from a real-machine real-run capture, produced through the **project's own existing build code**, **with every number/status/series on screen tracing to a named source (a file read, a command, a fixture, a real metric) a reader can re-derive** — never reinvented build logic, never a static screenshot or mock standing in for motion, never a real binary reciting `const` placeholders. A page that is entirely static (essay, letter, past-decision recap) needs no recording; the moment something moves, it does. When the capture *or the data behind it* fails, the §3.1.1 decision tree governs the fallback (①收窄结论 → ②用现有 code path 补建 → ③诚实标注 gap → ④block 上报) — a drawn substitute, or a recorded fake, is never one of the exits.
 9. Every page ships the “继续修改” bar from §5.1 — a text input plus a copy-prompt button — so a reader can turn a requested change into one terminal paste without hand-copying any URL. The copied prompt is self-contained: a `claude --resume <id>` handle **plus** the `slug` + `recall.sh` relocation path, never only a `file://` link, and it works the same in the published gist as locally. This bar and the audit pill are the only scripted elements on the page.
 10. Convincing pages (proof / pitch / status / "show the boss / VC / customer") follow §3.2: inverted pyramid — one-sentence value claim + proof chain on the first screen; no secret / key / internal job-dir / host path / failed-take / compression-log in the visible artifact; real limitations preserved but collapsed into a final 「诚实边界 / Verification notes」 `<details>`; the embedded motion artifact is self-labeled (cover title + burned-in step labels, MP4-primary + poster) so it stands alone; copy in ≤3-line paragraphs, non-engineer-legible headings, zero hype adjectives; two real buyer types get two re-framed tracks over the same evidence, never a fabricated second audience. Pure static communication (essay / letter / recap) is exempt.
+11. The evidence rule is **mechanical, not advisory** (§3.1.3). Before publish / before declaring the page done, `verify-evidence.sh` must pass: a page that embeds a motion artifact carries checkable provenance (inline `talk-html-evidence` record, a co-located `run-log.json`, or a *declared* `data-evidence="unrecorded"` gap), or it is provably static. `publish.sh` enforces the same gate as a fail-closed precondition. A failing gate is a §3.1.1 ④ block — never a reason to weaken the gate, and never a publish. This exists because a 36-clip human ground truth proved a pixel/motion proxy agrees with reality only ~half the time and never rejects fakes; provenance is the only signal that holds. Static pages (essay / letter / recap with no motion artifact) pass untouched.
+12. Eval / bad-case / Gate Rule pages obey §3.1.4. If the user asks for videos, playable videos, or attached videos, the page includes real `<video controls>` elements for the relevant failed cases or rule groups. Screenshots, posters, contact sheets, and static tables are supporting material only; they do not satisfy the video request. The mapping from `#Gate Rule {index}` to failed cases and related videos is visible, provenance is checkable, and playability is verified before publish.
