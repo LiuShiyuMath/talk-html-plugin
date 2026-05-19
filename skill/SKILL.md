@@ -20,6 +20,20 @@ Communicate in HTML, not chat. Local preview first, then gist-publish for perman
 > never a static screenshot or diagram standing in for motion. §3.0 and §3.1
 > below make this concrete and active.
 
+> **Source-of-truth guard — read this before any self-referential run.** The
+> *only* canonical spec for this skill is `~/.agents/skills/talk-html/SKILL.md`
+> (the symlink target that `~/.claude/skills/talk-html` and
+> `~/.codex/skills/talk-html` load). Any `*/talk-html/SKILL.md` found *inside a
+> project repo or a `.claude/worktrees/` checkout* is a **vendored copy**, not
+> the spec — it may be stale or trimmed. When the page's topic is talk-html
+> itself (redesign, diagnosis, "is it synced", proposal), the "dive into the
+> relevant repo" rule above does **not** apply to this file: never treat a
+> discovered in-repo `SKILL.md` as authoritative, and never re-propose rules
+> that the canonical already contains. Preflight, every run:
+> `bash ~/.agents/skills/talk-html/check-canon.sh --quiet` — it reports the
+> canonical sha256 and flags every drifted vendored copy (exit 1 on drift).
+> Run with `--heal` to collapse all vendored copies back onto canonical.
+
 ## When to invoke
 
 - The current answer is structured enough that an HTML page beats a chat scroll (essay, recap, status board, proposal, letter).
@@ -30,6 +44,32 @@ Communicate in HTML, not chat. Local preview first, then gist-publish for perman
 If the topic is **a finished UI feature / production page** belonging to a real product, use `frontend-design` or `design-html` instead. `talk-html` is for ephemeral communication artifacts, not shipped product UI.
 
 ## Workflow
+
+### 0. Preflight — canonical self-check (every run, blocking)
+
+Before anything else, run the drift sentinel:
+
+```bash
+bash ~/.agents/skills/talk-html/check-canon.sh --quiet
+```
+
+It prints the canonical sha256 and any persisted vendored copy that has
+drifted (transient `.claude/worktrees/` copies are skipped by default; add
+`--all` for a full sweep). Two cases:
+
+- **Topic is talk-html itself** (redesign / diagnosis / "is it synced" /
+  proposal): this preflight is **load-bearing**. Per the Source-of-truth guard,
+  the only spec is `~/.agents/skills/talk-html/SKILL.md`. Do not read any
+  in-repo `SKILL.md` as authoritative, and do not re-propose rules the
+  canonical already has. If the sentinel reports drift, run it once with
+  `--heal` to collapse the persisted copies back, then proceed.
+- **Any other topic**: the preflight is a cheap sanity line — note drift if
+  present, but it does not block the page.
+
+This step exists because the historical bad case was a /talk-html run "diving
+into the relevant repo" and reading a stale vendored copy of this very file as
+if it were the spec. The guard plus this preflight make that structurally
+impossible, not merely unlikely.
 
 ### 1. Resolve context
 
