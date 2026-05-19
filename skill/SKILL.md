@@ -93,6 +93,10 @@ Synthesize a `slug` (3–5 kebab-case words) and a one-sentence `prompt_summary`
 
 When in doubt: `explainer`.
 
+For `pitch` / `status` and any "show the boss / VC / customer" proof page, the
+template only picks the skeleton — the page's job is to *convince a specific
+reader*, so also apply **§3.2 (audience-first structure)** before writing.
+
 ### 3. Write the HTML
 
 Save to: `~/.agents/talk-html/<slug>-YYYYMMDD-HHMMSS.html`
@@ -177,7 +181,124 @@ On success it prints `KEY=VALUE` lines (`GIF=`, `GIF_B64=`, `POSTER=`, `POSTER_B
 
 When the helper does not fit (native app, hardware, a flow Playwright can't drive), still record reality — `tmux` + `asciinema`, `screencapture`, an `ffmpeg` screen grab — and embed that. The rule is *real run, real capture, embedded*; the helper is just the fast path for web UIs.
 
-If recording genuinely cannot be done (no display, the build is broken, credentials unavailable), do **not** fabricate a visual. Say so on the page in plain Chinese, show whatever raw evidence you do have (build log, `run-log.json`, HTTP statuses), and label the section as un-recorded.
+If recording genuinely cannot be done (no display, the build is broken, credentials unavailable), do **not** fabricate a visual. Say so on the page in plain Chinese, show whatever raw evidence you do have (build log, `run-log.json`, HTTP statuses), and label the section as un-recorded. The full decision is §3.1.1 — work it top to bottom.
+
+### 3.1.1 失败降级决策树 — when the supporting artifact fails to build
+
+§3.0/§3.1 assume the real run succeeds. Often it doesn't: the build is broken,
+the recorder crashes, a tool is missing on this machine, the run produces
+garbage. The failure of a supporting artifact is **never** a license to
+fabricate one — it is a fork with four ordered exits and one path that is
+structurally walled off. The exits exist because the cheapest move under
+pressure is "just draw something close enough", and that is exactly the move
+this skill is built to make impossible. Work down the list; take the first
+exit that holds, and stop there.
+
+**① 收窄结论 — narrow the conclusion.** Before reaching for any rebuild, ask
+what the *real evidence you already have* can honestly support, and shrink the
+claim to exactly that. A build log alone supports "the build step produced X,
+log attached" — not "the pipeline runs end to end." The conclusion follows the
+evidence; you never stretch the evidence to fit a conclusion you already wrote.
+Most "missing artifact" situations resolve here: the page stays true, just
+narrower. This exit is first because it is the only one that needs no new run —
+if a smaller honest claim still does the job, the artifact was never required.
+
+**② 用现有 code path 补建 — rebuild via the project's own path.** If a
+narrowed claim still needs a live artifact, produce it the way the project
+itself does: its existing entrypoint (`landing/build-static.sh`, `pnpm build`,
+`make site`, a documented script in `README` / `CLAUDE.md`), run verbatim,
+rendering what that path really emits. This is the §3.1 "use the project's OWN
+build code, never reinvent" rule applied as a *recovery* step, not just the
+happy path. If there is **no** existing build path, that absence is itself a
+finding for exit ④ — never a license to hand-write build logic so you can
+manufacture a visual. A run is only trustworthy because it came out of the
+pipeline the project actually ships; a bespoke build you wrote to pass your own
+page is not evidence.
+
+**③ 诚实标注 gap — honestly label the gap.** If it cannot be recorded, do not
+draw a stand-in. Say so on the page in plain Chinese, show the raw evidence you
+*do* have (build log, `run-log.json`, HTTP statuses), and mark that section
+explicitly as 未录制 / un-recorded. Per §3.2 this belongs in the collapsed
+「诚实边界 / Verification notes」 block — preserved, not hidden. A page that
+openly says "this part could not be recorded, here is the raw log" is honest
+and shippable; one that draws the missing run is not, no matter how plausible
+the drawing looks.
+
+**④ block 上报 — block and report.** If the core claim has *zero* real
+evidence behind it — nothing to narrow to, no usable build path, no raw log, or
+the originating session cannot be traced (Quality bar #6) — that is a build
+defect, not a publish signal. Stop. State plainly what is missing and why the
+page cannot stand, and surface it to whoever asked. Do not ship a hollow or
+fabricated page to keep the flow moving: a blocked report is a correct outcome,
+a fake page never is. Exit ④ is a real, expected ending, not a failure of the
+skill.
+
+**The walled-off path — never an exit.** A hand-drawn mock, a concept sketch,
+a fabricated UI, or a static screenshot standing in for motion is **not** one
+of the four exits — it is precisely the move the load-bearing principle, §3.0,
+§3.1, and Quality bar #8 all exist to forbid. The only time a drawn mock is
+legitimate is when the user explicitly asked for one. Absent that explicit
+request, "the artifact failed to build" routes ①→②→③→④ and never to a drawn
+substitute; there is no fifth door.
+
+### 3.2 Audience-first structure for proof / pitch / status pages
+
+When the page's job is to **convince a reader** — a proof-of-work page, a
+pitch, a status board, a "show the boss / VC / customer" artifact — it is
+judged by that reader, not by the engineer who built it. §3.0/§3.1 make the
+evidence *real*; this step makes it *legible to the buyer*. A page that is
+technically honest but front-loads engineering exhaust still fails its job: the
+reader bounces before reaching the proof. This is the most common way a
+source-grounded page underperforms — strong evidence buried under build notes.
+
+**Inverted pyramid — value and proof first, plumbing last.** The first screen
+carries only two things: a one-sentence value claim a non-engineer can repeat,
+and the proof chain (what was shown, what it rules out). Everything the reader
+did not ask for moves down or out:
+
+- **Out of the visible artifact entirely** — this is leakage, not honesty:
+  secrets and API keys, internal job dirs, the host machine's OS / username /
+  absolute paths, raw multi-screen JSON dumps, `*.cast` paths, the failed or
+  retried takes, compression command logs (`gifsicle -O3 …`, `ffmpeg` flags),
+  per-tool plumbing. A reader does not audit your recording process; a key or
+  an internal path on a shared page is a defect, not transparency.
+- **Sunk to the bottom, collapsed, not deleted** — real limitations and scope
+  caveats. Keep them; hiding limits *is* dishonest. But put them in one final
+  section titled **「诚实边界 / Verification notes」**, inside `<details>`,
+  never on the first screen. Honest ≠ first.
+
+**Shape a convincing page as ~6 blocks**, in order: (1) Hero — one value
+sentence; (2) Problem — the failure the reader recognizes, in their words;
+(3) Proof — the embedded real run (§3.1) with a proof-chain caption that says
+what it rules out, not just what it shows; (4) What to verify — the causal
+chain as discrete checkable claims; (5) Judge / third-party result — the
+external verdict surfaced as a strong endorsement *next to* the proof, not
+buried; (6) 诚实边界 — collapsed, last.
+
+**Two-audience artifacts.** When the same proof genuinely serves two distinct
+buyers — e.g. an investor who needs *market / moat / repeatable infrastructure*
+and a customer who needs *risk reduction / auditability / their own acceptance
+path* — give them two tracks: audience tabs or two in-page anchors that re-frame
+the copy over the **same** evidence, not one averaged page that lands with
+neither. Do not invent a second audience to look thorough; split only when both
+readers are real for this artifact.
+
+**The motion artifact must stand alone.** The embedded video/GIF (§3.1) is
+often seen without the surrounding prose — dropped into a deck, forwarded, read
+on a phone. It must carry its own meaning: a cover title, short step labels
+burned into the frames, a held/zoomed beat on each pivotal moment (the DENY,
+the PASS), legible at phone size. Prefer **MP4 primary + GIF fallback + poster
+frame**; a reader who only ever sees the poster should still get the claim. The
+page prose may explain the artifact; the artifact must not *depend* on it.
+
+**Copy discipline (the buyer reads this, not your team).** Paragraphs ≤ 3
+lines. Every heading legible to a non-engineer — a recruiter, a CFO, a founder.
+No hype adjectives: "革命性", "颠覆性", "revolutionary", "game-changing" are
+banned — the proof is the claim. The page should read like something you would
+hand a boss / VC / customer, not like an internal retro or a build log.
+
+Pure static communication (essay, letter, past-decision recap) is exempt — this
+section bites only when the page's job is to convince.
 
 ### 4. Stamp metadata
 
@@ -463,8 +584,9 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 | `htmlpreview.github.io` 404 right after publish | Expected CDN lag. Wait 10 s then retry. |
 | User wants changes after publish | Regenerate the HTML, re-run `publish.sh` (creates a fresh gist). The first publish is not final. |
 | User explicitly said "don't publish" | Honor it — keep the local file, print the local path + the manual `publish.sh` command. Never publish over an explicit opt-out. |
-| `record-to-gif.sh` build step fails | The project's build is broken, not your problem to paper over. Surface `build.log`, embed it as raw evidence, label the visual section un-recorded (§3.1). Do not substitute a mock. |
-| `ffmpeg` / `node` missing for recording | Print install hint (`brew install ffmpeg`). Fall back to embedding still screenshots from `screencapture` / Playwright if possible; otherwise label the section un-recorded. |
+| `record-to-gif.sh` build step fails | Run the §3.1.1 tree: narrow the claim (①) or rebuild via the project's own path (②); if neither holds, surface `build.log` as raw evidence and label the section un-recorded (③, §3.1.1). Never substitute a mock. |
+| `ffmpeg` / `node` missing for recording | Print install hint (`brew install ffmpeg`). Per §3.1.1: fall back to still screenshots from `screencapture` / Playwright if they honestly support a narrowed claim (①); otherwise label the section un-recorded (③), never a drawn stand-in. |
+| Core claim has no real evidence at all | §3.1.1 exit ④: this is a build defect, not a publish signal. Stop, state what is missing, report it. Do not ship a hollow or fabricated page to keep the flow moving. |
 
 ## Quality bar — do not violate
 
@@ -475,5 +597,6 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 5. File < 200 KB unless content genuinely demands more. A real embedded recording (GIF/video data-URI) is a legitimate reason to exceed it — note the size in the page and offer to compress.
 6. Every HTML can be traced back to its originating session via three independent paths: the audit pill (shows the human-readable `origin_prompt` name and offers a copy-to-clipboard `claude --resume <id>` command to re-enter the conversation), the `<!-- talk-html-meta -->` comment, **and** the index.jsonl row. The pill must never reduce to a bare session hash, and must not rely on a `file://` transcript link — that link is dead in the published gist.
 7. Gist/htmlpreview parity: if the local preview has a visible GIF/image/evidence block or a clickable source/proof control, the rendered gist must expose the same material without broken `file://` or local relative links.
-8. Non-static content is recorded, not drawn (§3.1). Anything interactive, live/status, animated, or "this UI/demo/dashboard runs" — in the subject matter *or* the page itself — is backed by a real embedded video or GIF from a real-machine real-run capture, produced through the **project's own existing build code** — never reinvented build logic, never a static screenshot or mock standing in for motion. A page that is entirely static (essay, letter, past-decision recap) needs no recording; the moment something moves, it does.
+8. Non-static content is recorded, not drawn (§3.1). Anything interactive, live/status, animated, or "this UI/demo/dashboard runs" — in the subject matter *or* the page itself — is backed by a real embedded video or GIF from a real-machine real-run capture, produced through the **project's own existing build code** — never reinvented build logic, never a static screenshot or mock standing in for motion. A page that is entirely static (essay, letter, past-decision recap) needs no recording; the moment something moves, it does. When that capture fails, the §3.1.1 decision tree governs the fallback (①收窄结论 → ②用现有 code path 补建 → ③诚实标注 gap → ④block 上报) — a drawn substitute is never one of the exits.
 9. Every page ships the “继续修改” bar from §5.1 — a text input plus a copy-prompt button — so a reader can turn a requested change into one terminal paste without hand-copying any URL. The copied prompt is self-contained: a `claude --resume <id>` handle **plus** the `slug` + `recall.sh` relocation path, never only a `file://` link, and it works the same in the published gist as locally. This bar and the audit pill are the only scripted elements on the page.
+10. Convincing pages (proof / pitch / status / "show the boss / VC / customer") follow §3.2: inverted pyramid — one-sentence value claim + proof chain on the first screen; no secret / key / internal job-dir / host path / failed-take / compression-log in the visible artifact; real limitations preserved but collapsed into a final 「诚实边界 / Verification notes」 `<details>`; the embedded motion artifact is self-labeled (cover title + burned-in step labels, MP4-primary + poster) so it stands alone; copy in ≤3-line paragraphs, non-engineer-legible headings, zero hype adjectives; two real buyer types get two re-framed tracks over the same evidence, never a fabricated second audience. Pure static communication (essay / letter / recap) is exempt.
