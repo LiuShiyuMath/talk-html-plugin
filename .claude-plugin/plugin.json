@@ -1,0 +1,20 @@
+{
+  "name": "talk-html-plugin",
+  "version": "0.2.0",
+  "description": "Talk to humans in HTML — role-aware. /talk-html routes the page to one of 8 audience-specific sub-commands (/talk-ux, /talk-ceo, /talk-data, /talk-reviewer, /talk-cto, /talk-qa, /talk-docs, /talk-legal). Each role hardcodes the audience, the proof modality they must see, the build tools, the programmatic evaluation tools, and the deterministic CI gate from the proof-build-eval matrix. Pages are grounded in real content, embed real recordings for anything non-static, render in zh-CN, preview locally, and publish to a GitHub gist by default.",
+  "author": {
+    "name": "LiuShiyuMath"
+  },
+  "homepage": "https://github.com/LiuShiyuMath/talk-html-plugin",
+  "license": "MIT",
+  "keywords": [
+    "talk-html",
+    "router",
+    "role-aware",
+    "html-page",
+    "proof-matrix",
+    "evidence",
+    "gist",
+    "zh-CN"
+  ]
+}
