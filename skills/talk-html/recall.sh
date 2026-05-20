@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-INDEX="$HOME/.claude/talk-html/index.jsonl"
+INDEX="$HOME/.agents/talk-html/index.jsonl"
 [[ -f "$INDEX" ]] || { echo "no talk-html artifacts yet (index missing: $INDEX)"; exit 0; }
 
 # reverse the file (macOS-friendly: tail -r; gnu: tac)
