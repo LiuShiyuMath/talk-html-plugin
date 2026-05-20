@@ -1,0 +1,100 @@
+---
+description: Router for talk-html. Look at the page topic, infer the artifact_type from skills/talk-html/role-routing.csv, then dispatch to /talk-ux, /talk-ceo, /talk-data, /talk-reviewer, /talk-cto, /talk-qa, /talk-docs, or /talk-legal. Use when the user says talk-html, 用 html 解释, 做成一页, make a page, publish as gist, or asks to render something for a specific audience.
+---
+
+```
+                        /talk-html  (router)
+                              │
+                              ▼
+                  ┌── infer artifact_type ──┐
+                  │  (from page topic)      │
+                  └────────────┬────────────┘
+                               │
+       ┌───────────┬───────────┼───────────┬───────────┐
+       ▼           ▼           ▼           ▼           ▼
+  /talk-ux    /talk-ceo   /talk-data /talk-reviewer /talk-cto
+       │           │           │           │           │
+       └────┬──────┴────┬──────┴────┬──────┴────┬──────┘
+            ▼           ▼           ▼           ▼
+       /talk-qa   /talk-docs  /talk-legal       …
+            │           │           │
+            └───────────┴───────────┘
+                        │
+                        ▼
+              skills/talk-html (核心渲染管线)
+              preflight → resolve → template
+              → real-content grounding → embed
+                 real recording (non-static)
+              → publish → recall
+```
+
+# /talk-html — 角色路由
+
+`/talk-html` 本身不渲染页面。它做一件事：**先决定这页是给谁看**，再分派到对应的 role 子命令。
+
+子命令负责锁住三件不可让步的东西：
+1. **必看 proof 形态** — `who_must_see` 这一栏的人**只接受**这种证据（reviewer 只读 diff；UX 只看 recording；perf 只看 benchmark chart）。
+2. **build / eval 工具集** — 怎样把 proof 真的造出来、并用第三方工具机器化判定通过/不通过。
+3. **deterministic gate** — pass/fail 阈值，写在文档里、不靠人感觉。
+
+子命令在锁完上面三件事后，统一 defer 给 `skills/talk-html/SKILL.md` 完成 preflight、模板选择、真实内容 grounding、非静态 embed、发布、回看。
+
+## 路由规则
+
+按以下顺序判断：
+
+1. **用户明确指定角色** —— 比如「给 CEO 看的一页」「让 reviewer 收下这个 diff」「我要给 DBA 看 migration」——直接跳到对应 role 命令，不再做 artifact 推断。
+2. **从对话内容推断 artifact_type** —— 读最近的消息、被引用的文件、被运行的命令。匹配 `skills/talk-html/role-routing.csv` 第一列 `artifact_type`。
+3. **CSV 的 `role_command` 列就是分派目的地**。
+
+## artifact_type → role_command 速查
+
+读权威表请用：
+
+```bash
+cat ${CLAUDE_PLUGIN_ROOT}/skills/talk-html/role-routing.csv
+```
+
+下面是按角色聚合的快速索引（同样的数据，按目的地分组）：
+
+| Role 子命令 | 覆盖的 artifact_type |
+|---|---|
+| `/talk-ux` | UI screen · Interactive web UI · Design system component · Localization · Accessibility · Mobile app · Visual asset · Email template |
+| `/talk-ceo` | Release candidate · Video/motion asset · Payment / checkout flow |
+| `/talk-data` | Database migration · Data pipeline · Analytics dashboard · AI/ML model change |
+| `/talk-reviewer` | Code change · API change |
+| `/talk-cto` | Performance change · Web performance · Architecture change · Deployment · Incident fix |
+| `/talk-qa` | Interactive TUI · CLI output · Bug fix · Test result · Permission / admin flow |
+| `/talk-docs` | Documentation |
+| `/talk-legal` | Security fix · Legal/compliance copy |
+
+## 多角色情况
+
+一页可以同时是几个 artifact_type（典型例：**API change + DB migration**）。这时不是平均化成一页：
+
+- 主路由：依首要受众挑一个 role 命令为主（reviewer 优先于 DBA，因为代码变更先于落库）。
+- 副录：在主页面里补一节「同一证据给另一受众的视角」，分两条 evidence track，**不要**糅成一段。
+
+## 模糊情况
+
+仅当下列条件**同时**成立时才反问用户，否则直接做合理推断：
+
+1. 对话里没有可识别的 artifact_type；
+2. 没有受众线索；
+3. 现成 fallback（默认 `/talk-reviewer` 用于代码、`/talk-ux` 用于 UI）会得到结构性错误的页面。
+
+否则：选最近一个 reasonable role，在生成的页面顶部用一行小字说明你按 `<artifact_type>` 处理；用户能在浏览器里立刻看到判断对不对。
+
+## 不做的事
+
+- 不渲染最终 HTML（那是 `skills/talk-html` 的活）。
+- 不绕过子命令直接 publish。
+- 不替换子命令里写死的 gate 阈值——那是该角色的契约。
+- 不在 artifact_type 不明时主动 mock 内容；先按 `skills/talk-html` 的「real content not drawn demos」原则去仓库里找真实素材。
+
+## 与 `skills/talk-html` 的关系
+
+`commands/` 决定**给谁看、要什么 proof、用什么 gate**。
+`skills/talk-html/SKILL.md` 决定**怎么把页面真造出来**（preflight 自愈、模板、源头校验、嵌入真 video/GIF、publish、recall）。
+
+路由层不重复 skill 的规则，子命令也不重复路由层。

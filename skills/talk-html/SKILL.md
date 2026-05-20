@@ -215,7 +215,7 @@ Recording does not launder data. A real PTY capture of a real binary that is dis
 - a **status / live feature** — a `status`-template board, a progress register, a streaming build, anything whose worth is "what state is it in *right now*";
 - **motion** — an animation, a transition, an animated diagram, anything beyond decorative CSS.
 
-Static artifacts — a plain essay, a letter, a recap of past decisions with no live element — are unaffected. The rule only bites when something actually moves; when it does, the moving proof is non-negotiable.
+Static artifacts — a plain essay, a letter, a recap of past decisions with no live element — are unaffected. The rule only bites when something actually moves; when it does, the moving proof is non-negotiable. §3.2.1 turns this static-vs-motion call into a per-artifact lookup — which artifact types owe a moving capture, and which reviewer rejects the page without it.
 
 **Use the project's OWN existing build code. Never reinvent build logic.** The whole point: the artifact is trustworthy because it came out of the same pipeline the project actually ships. Find the project's existing entrypoint — `landing/build-static.sh`, `pnpm build`, `make site`, `next build`, a `justfile` target, a documented script in `README` / `CLAUDE.md` — and run *that* verbatim. If you cannot find an existing build path, that is a finding to report, not a license to write your own.
 
@@ -421,7 +421,11 @@ path as §3.1.1 — embedding the artifact anyway, or hand-writing a
 `talk-html-evidence` record for a run that did not happen, *is* the
 fabrication this whole section exists to forbid. A passing gate is a floor,
 not a certificate: it proves the run is traceable, the reader still judges
-whether the traced run actually supports the claim.
+whether the traced run actually supports the claim. Which programmatic tools
+produce that machine-checkable verdict, and the deterministic pass/fail
+threshold, are tabulated per `artifact_type` in §3.2.1's
+`proof-build-eval-matrix.csv` — the gate there feeds this one, it does not
+replace it.
 
 ### 3.1.4 Eval / bad-case pages that ask for videos must play video
 
@@ -452,7 +456,8 @@ case, failed probe group, or `#Gate Rule {index}` cluster needs a visible
 When the page's job is to **convince a reader** — a proof-of-work page, a
 pitch, a status board, a "show the boss / VC / customer" artifact — it is
 judged by that reader, not by the engineer who built it. §3.0/§3.1 make the
-evidence *real*; this step makes it *legible to the buyer*. A page that is
+evidence *real*; this step makes it *legible to the buyer* — and §3.2.1 names,
+per artifact type, the exact proof modality and the reviewer who must see it. A page that is
 technically honest but front-loads engineering exhaust still fails its job: the
 reader bounces before reaching the proof. This is the most common way a
 source-grounded page underperforms — strong evidence buried under build notes.
@@ -505,6 +510,102 @@ hand a boss / VC / customer, not like an internal retro or a build log.
 
 Pure static communication (essay, letter, past-decision recap) is exempt — this
 section bites only when the page's job is to convince.
+
+### 3.2.1 证据类型 × 必看人 × 怎么机判 — the proof, reviewer & gate matrices
+
+§3.1 decides *whether* a thing needs motion; §3.2 decides *who* the page must
+convince. Between them sits a recurring miss: the page is honest and embeds *a*
+proof, but the wrong *kind* of proof for the artifact it reports, so the one
+reviewer whose sign-off it needs bounces. A code reviewer asked to approve a
+change does not read raw post-change source — they read the diff. A UX reviewer
+cannot judge an interaction from a screenshot — they need it recorded. A QA
+engineer will not take "bug fixed" as a sentence — they need failing-before /
+passing-after. The proof *modality* is part of the claim, not packaging; pick
+the wrong one and the page is unfalsifiable to exactly the person it is for.
+
+`references/proof-matrix.csv` (absolute, since the loader symlinks vary:
+`~/.agents/skills/talk-html/references/proof-matrix.csv`) tabulates the floor.
+Each row maps one `artifact_type` → the `visual_proof_type` it owes, the
+`role_that_MUST_see_it`, the `recommended_view` that role actually reads, and
+`why_they_need_it`. Consult it whenever the page's subject is a concrete change
+or deliverable — code / UI / interactive UI or TUI / bug fix / test / perf /
+security / API / DB migration / architecture / data pipeline / dashboard / docs
+/ localization / a11y / release / mobile / deploy / incident / ML model /
+payments / permissions, and the like.
+
+Use it in order:
+
+1. **Name the artifact_type.** What did this page actually report a change to?
+   Match the closest row(s). One page can be several types at once (an API
+   change *and* a DB migration) — it then owes the proof each row lists, not
+   one proof for the pair.
+2. **Owe that visual_proof_type, in that recommended_view.** This is the §3.1
+   static-vs-motion call made concrete per artifact: rows whose proof is
+   `GIF / MP4` or a `recording` are **non-static** — §3.1 / §3.1.4 apply in
+   full, the page embeds a real moving capture, never a screenshot standing in
+   for it. Rows whose proof is a diff / report / chart / matrix are static but
+   still specific: a code change owes a *diff view*, not a wall of raw source;
+   a DB migration owes a *schema/ERD diff + dry-run output*, not prose.
+3. **Shape §3.2 around the role_that_MUST_see_it.** That role is this page's
+   buyer; `why_they_need_it` is the proof-chain caption written in their words,
+   not the engineer's. When two rows name two genuinely different roles for the
+   same artifact (Code Reviewer *and* Tech Lead; Designer *and* Product Owner),
+   that is the §3.2 two-audience split — two re-framed tracks over the **same**
+   evidence, not one averaged page.
+
+Once you know *what* proof to build, `references/proof-build-eval-matrix.csv`
+(absolute: `~/.agents/skills/talk-html/references/proof-build-eval-matrix.csv`)
+carries the operational layer for the same `artifact_type` rows:
+`visual_proof_to_build`, candidate `build_tools`, the
+`programmatic_evaluation_tools` and the `deterministic_gate` that decide
+pass/fail, and the `ci_output` artifact to embed or link. It is the bridge from
+"I know the proof" to a *mechanically checkable* one:
+
+- **build_tools are candidates, not a license to reinvent.** §3.1 still rules:
+  if the project has its own entrypoint that produces this proof, run *that*
+  verbatim; reach for a listed tool only when none exists. A `build_tool` here
+  is a starting point for the §3.1.1 ② rebuild path, never permission to
+  hand-roll build logic just so a visual exists.
+- **deterministic_gate is the §3.1.3 / third-party-judge rule per artifact.**
+  Run the `programmatic_evaluation_tools`, let them emit their own machine
+  output (`junit.xml`, `coverage.html`, `sarif`, `lhci`, `ffprobe.json`, …),
+  and read the gate from *that* — never from the page author's, the executing
+  agent's, or the artifact's own say-so. The gate string is the objective
+  pass/fail a third party can re-run; it sits *in front of* the §3.1.3
+  `verify-evidence.sh` provenance gate, it does not replace it.
+- **ci_output is what the page embeds or links**, carrying §3.0.1 provenance
+  so a reader can re-derive the verdict — not a screenshot of a green check.
+
+One carve-out: where `build_tools` lists Mermaid / PlantUML, that means
+*render them to a static SVG/PNG at build time and embed the image* — never a
+live Mermaid block (Quality bar #4: the page ships JS-free).
+
+Both tables are a floor on *specificity*, not a substitute for any rule above
+them. Neither relaxes §3.0.1 (a recording is still a real run on real data, not
+a binary reciting `const` literals) or the §3.1.3 evidence gate (the moving
+proof still needs checkable provenance). An `artifact_type` not in the tables is
+not exempt — fall back to reasoning about whether it moves under §3.1. Their
+whole value is catching the most common failure — right honesty, wrong proof,
+wrong reader, unverifiable gate — *before* the page is built rather than after
+a reviewer has already bounced.
+
+For a single lookup, the two tables are also shipped pre-joined as
+`references/proof-matrix-merged.csv` (absolute:
+`~/.agents/skills/talk-html/references/proof-matrix-merged.csv`) — one row per
+`artifact_type` × `role_that_MUST_see_it`, carrying the reviewer-view columns
+*and* the build / eval / `deterministic_gate` / `ci_output` columns side by
+side, so the whole obligation (who, what view, why, how to build it, how to
+mechanically gate it, which CI artifact) reads without cross-referencing. It is
+a deterministic join, not a hand-merge: the two component files stay the
+normalized source of truth — a reviewer-intent table and a build/gate table —
+and the merged view is regenerated from them by
+`python3 ~/.agents/skills/talk-html/merge-proof-matrices.py` (a deterministic,
+idempotent join). **Maintain the components, rerun the script, hand-edit the
+merge never.** Where a build/gate type has no reviewer-intent row of its
+own (e.g. `Web performance`), it still appears, with an empty
+`why_they_need_it` — that blank is honest, not a gap to invent copy into. Use
+whichever serves the moment: the merged file to act on one artifact, the
+components to maintain the rules.
 
 ### 4. Stamp metadata
 
@@ -809,3 +910,4 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 10. Convincing pages (proof / pitch / status / "show the boss / VC / customer") follow §3.2: inverted pyramid — one-sentence value claim + proof chain on the first screen; no secret / key / internal job-dir / host path / failed-take / compression-log in the visible artifact; real limitations preserved but collapsed into a final 「诚实边界 / Verification notes」 `<details>`; the embedded motion artifact is self-labeled (cover title + burned-in step labels, MP4-primary + poster) so it stands alone; copy in ≤3-line paragraphs, non-engineer-legible headings, zero hype adjectives; two real buyer types get two re-framed tracks over the same evidence, never a fabricated second audience. Pure static communication (essay / letter / recap) is exempt.
 11. The evidence rule is **mechanical, not advisory** (§3.1.3). Before publish / before declaring the page done, `verify-evidence.sh` must pass: a page that embeds a motion artifact carries checkable provenance (inline `talk-html-evidence` record, a co-located `run-log.json`, or a *declared* `data-evidence="unrecorded"` gap), or it is provably static. `publish.sh` enforces the same gate as a fail-closed precondition. A failing gate is a §3.1.1 ④ block — never a reason to weaken the gate, and never a publish. This exists because a 36-clip human ground truth proved a pixel/motion proxy agrees with reality only ~half the time and never rejects fakes; provenance is the only signal that holds. Static pages (essay / letter / recap with no motion artifact) pass untouched.
 12. Eval / bad-case / Gate Rule pages obey §3.1.4. If the user asks for videos, playable videos, or attached videos, the page includes real `<video controls>` elements for the relevant failed cases or rule groups. Screenshots, posters, contact sheets, and static tables are supporting material only; they do not satisfy the video request. The mapping from `#Gate Rule {index}` to failed cases and related videos is visible, provenance is checkable, and playability is verified before publish.
+13. Pages whose subject is a concrete change or deliverable consult the §3.2.1 matrices. From `~/.agents/skills/talk-html/references/proof-matrix.csv`: the embedded proof matches the artifact's owed `visual_proof_type` rendered in its `recommended_view`, the page is structured for the `role_that_MUST_see_it` with `why_they_need_it` as the proof-chain caption, and GIF/MP4/recording rows are treated as non-static under §3.1/§3.1.4. From `~/.agents/skills/talk-html/references/proof-build-eval-matrix.csv`: the proof is built with the project's own entrypoint where one exists (`build_tools` are candidates, never a license to reinvent build logic — §3.1 / §3.1.1 ②), its `deterministic_gate` is decided by the listed `programmatic_evaluation_tools`' own machine output (not self-judged by author/agent/artifact — the §3.1.3 / third-party-judge rule per artifact), and the `ci_output` is embedded or linked with §3.0.1 provenance, not a screenshot of a green check. Both are a floor on *specificity*; neither relaxes §3.0.1 or the §3.1.3 evidence gate, and Mermaid/PlantUML `build_tools` mean render-to-static-SVG, never a live JS block (Quality bar #4). The same obligation is shipped pre-joined as `~/.agents/skills/talk-html/references/proof-matrix-merged.csv` (one row per artifact_type × reviewer, all ten columns) for a single lookup — it is a deterministic join of the two component files, so maintain the components and never hand-edit the merge. Pure static communication (essay / letter / recap) with no reported artifact is exempt.
