@@ -86,27 +86,36 @@ versions", because Instant never read the page.) The **advanced "Thinking"**
 model actually browses the page before drawing, which is the whole point of
 passing a link.
 
-So **before** sending the prompt, switch the model to advanced + thinking:
+**Where the control actually is (verified on a live zh-CN account, 2026-05):**
+there is no top-left "model-switcher-dropdown-button" on this UI. The mode
+picker is a button **inside the composer**, collapsed-labelled **`进阶`**
+(= "Advanced"). Clicking it opens a small menu with exactly two
+`[role=menuitemradio]` entries — **`Instant`** and **`Thinking • 进阶`** — and
+the active one carries `aria-checked="true"` (or `[checked]`). The collapsed
+button only ever says `进阶`, so do **not** gate on the collapsed text — gate on
+which **radio is checked** (that is Step 1.6).
+
+So **before** sending the prompt, open that menu and select Thinking:
 
 ```bash
 "$B" tab <id>
-# Open the model switcher (top of a fresh chat). Primary: stable testid.
-"$B" js 'var b=document.querySelector("[data-testid=\"model-switcher-dropdown-button\"]")||[...document.querySelectorAll("button")].find(x=>/gpt|model|instant|thinking|auto/i.test((x.getAttribute("aria-label")||"")+x.textContent)); if(b){b.click();"opened:"+b.textContent.trim().slice(0,40)}else"NO-SWITCHER"'
+# 1) Open the composer mode dropdown. It is the button labelled exactly "进阶"
+#    (Advanced); also match Instant/Thinking in case the label localizes.
+"$B" snapshot -i | grep -iE '\[button\] "(进阶|Instant|Thinking)' | head   # find its @eNN ref
+"$B" click @eNN          # click that ref (more reliable than JS .click() on a wrapper)
 sleep 1
-# Pick the advanced / Thinking entry from the menu (match several labels/locales).
-"$B" js 'var m=[...document.querySelectorAll("[role=menuitem],[role=option],button,a")].find(x=>/thinking|advanced|思考|高级|GPT-5\s*(Thinking|Pro)/i.test(x.textContent)); if(m){m.click();"picked:"+m.textContent.trim().slice(0,40)}else"NO-THINKING-ITEM"'
+# 2) Pick the Thinking radio (covers "Thinking • 进阶" and locale variants).
+"$B" js 'var m=[...document.querySelectorAll("[role=menuitemradio],[role=menuitem],[role=option]")].find(x=>/thinking|思考|advanced|高级/i.test(x.textContent)); if(m){m.click();"picked:"+m.textContent.trim().slice(0,40)}else"NO-THINKING-ITEM"'
 sleep 1
-# Verify the header now reflects an advanced/thinking model (not Instant).
-"$B" js 'var h=document.querySelector("[data-testid=\"model-switcher-dropdown-button\"]"); h?h.textContent.trim():"?"'
 ```
 
-If the switcher cannot be found or the account has no access to the advanced
-model (e.g. a free tier showing an upgrade/pay prompt), **do not silently fall
+If the dropdown cannot be found, or the menu offers no Thinking entry (e.g. a
+free tier with only Instant, or an upgrade/pay prompt), **do not silently fall
 back to Instant** — that reintroduces the hallucination. Stop and tell the user
-to **manually flip the model to the advanced "Thinking" mode** in the shared
-browser, then continue. Selectors drift; if the JS above returns
-`NO-SWITCHER` / `NO-THINKING-ITEM`, snapshot the top bar
-(`"$B" snapshot -i | head -30`) to find the current control before retrying.
+to **manually flip the composer mode to "Thinking • 进阶"** in the shared
+browser, then continue. Selectors drift; if the grep finds no ref or the JS
+returns `NO-THINKING-ITEM`, snapshot the composer
+(`"$B" snapshot -i | grep -iE 'textbox|进阶|button'`) to relocate the control.
 
 ## Step 1.6 — Double-check the model (fail-closed gate, run every time)
 
@@ -114,33 +123,43 @@ Step 1.5 *attempts* the switch; this step *proves* it took. They are different
 jobs: a click can silently no-op (menu didn't open, label localized
 differently, account downgraded mid-session), and the failure is invisible —
 you only find out when the image comes back off-topic. So before sending the
-prompt, **read the model label back and gate on it**. This is the load-bearing
-check the user asked for: positively confirm the active model **says
-Thinking/advanced** and **does not say Instant/即时**. Anything else stops the
-run — never "probably fine".
+prompt, **read which mode radio is checked and gate on it**. Do not parse the
+collapsed `进阶` button text — it says `进阶` whether Instant or Thinking is
+active, so it cannot tell them apart. The truth signal is the **checked
+`menuitemradio`** inside the open menu. This is the load-bearing check the user
+asked for: positively confirm the **checked** mode is Thinking and **not**
+Instant. Anything else stops the run — never "probably fine".
 
 ```bash
 "$B" tab <id>
-LABEL="$("$B" js 'var h=document.querySelector("[data-testid=\"model-switcher-dropdown-button\"]")||[...document.querySelectorAll("button")].find(x=>/instant|thinking|即时|思考|gpt-5/i.test((x.getAttribute("aria-label")||"")+x.textContent)); h?(h.getAttribute("aria-label")||h.textContent).trim():"NO-LABEL"' 2>/dev/null | tr -d '\r\n')"
-echo "active model label: [$LABEL]"
-# Fail-closed verdict: must be advanced/Thinking AND must NOT be Instant.
-printf '%s' "$LABEL" | grep -Eqi 'thinking|advanced|思考|高级|pro' \
-  && ! printf '%s' "$LABEL" | grep -Eqi 'instant|即时|fast' \
-  && [ "$LABEL" != "NO-LABEL" ] \
-  && echo "GATE: PASS — advanced/Thinking confirmed, proceeding" \
-  || echo "GATE: FAIL — model is Instant or unconfirmed; STOP, do not send the prompt"
+# Re-open the composer mode dropdown (same "进阶"/Instant/Thinking button as Step 1.5).
+"$B" snapshot -i | grep -iE '\[button\] "(进阶|Instant|Thinking)' | head
+"$B" click @eNN
+sleep 1
+# Read the CHECKED radio's label — this is the active model, unambiguously.
+CHECKED="$("$B" js '[...document.querySelectorAll("[role=menuitemradio]")].filter(r=>r.getAttribute("aria-checked")==="true"||r.hasAttribute("checked")).map(r=>r.textContent.trim()).join("|")||"NO-CHECKED"' 2>/dev/null | tr -d '\r\n')"
+"$B" press Escape   # close the menu before sending
+echo "checked mode radio: [$CHECKED]"
+# Fail-closed verdict: the checked radio must be Thinking AND must NOT be Instant.
+printf '%s' "$CHECKED" | grep -Eqi 'thinking|思考|advanced|高级' \
+  && ! printf '%s' "$CHECKED" | grep -Eqi 'instant|即时|fast' \
+  && [ "$CHECKED" != "NO-CHECKED" ] \
+  && echo "GATE: PASS — checked mode is Thinking, proceeding" \
+  || echo "GATE: FAIL — checked mode is Instant or unconfirmed; STOP, do not send the prompt"
 ```
 
 Read the verdict, do not assume it:
 
-- **`GATE: PASS`** — the label affirmatively shows Thinking/advanced and has no
-  Instant marker. Only now continue to Step 2.
-- **`GATE: FAIL`** (label is `Instant`/`即时`, empty, `NO-LABEL`, or anything you
-  can't positively read as advanced) — **do not send the prompt.** Re-run the
-  Step 1.5 switch once; if it still fails, stop and tell the user to **manually
-  set the model to advanced "Thinking"** in the shared browser, then resume.
-  Sending on an unconfirmed model is the exact failure this skill exists to
-  prevent — an Instant run that looks fine and ships an off-topic image.
+- **`GATE: PASS`** — the checked radio affirmatively reads Thinking (e.g.
+  `Thinking • 进阶`) with no Instant marker. Only now continue to Step 2.
+- **`GATE: FAIL`** (checked radio is `Instant`/`即时`, `NO-CHECKED`, or anything
+  you can't positively read as Thinking) — **do not send the prompt.** Re-run
+  the Step 1.5 switch once; if it still fails, stop and tell the user to
+  **manually set the composer mode to "Thinking • 进阶"** in the shared browser,
+  then resume. Sending on an unconfirmed model is the exact failure this skill
+  exists to prevent — an Instant run that looks fine and ships an off-topic
+  image (verified: an Instant run hallucinated a "并发寄存器" infographic from a
+  filename; the same page on Thinking produced a correct, on-topic illustration).
 
 Why fail-closed (refuse on doubt) rather than fail-open (proceed and hope): a
 false "looks ok" here is silent and expensive — it costs a full generate +
