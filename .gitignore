@@ -1,0 +1,10 @@
+# build artifacts — browse binary is built at install via `bun run build`, never committed
+dist/
+**/dist/
+node_modules/
+*.bun-build
+# local archives / backups
+*.archived-*.zip
+归档.zip
+.DS_Store
+*.log

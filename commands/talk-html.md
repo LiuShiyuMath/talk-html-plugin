@@ -1,6 +1,16 @@
 ---
-description: Router for talk-html. Look at the page topic, infer the artifact_type from skills/talk-html/role-routing.csv, then dispatch to /talk-ux, /talk-ceo, /talk-data, /talk-reviewer, /talk-cto, /talk-qa, /talk-docs, or /talk-legal. Use when the user says talk-html, 用 html 解释, 做成一页, make a page, publish as gist, or asks to render something for a specific audience.
+description: Router for talk-html. Look at the page topic, infer the artifact_type from skills/talk-html/role-routing.csv, then dispatch to /talk-ux, /talk-ceo, /talk-data, /talk-reviewer, /talk-cto, /talk-qa, /talk-docs, or /talk-legal. Use when the user says talk-html, 用 html 解释, 做成一页, make a page, publish as gist, or asks to render something for a specific audience. Pass --image to auto-illustrate the page (配图) after publishing, via the bundled gpt-image + browse skills.
 ---
+
+## `--image` 标志 — 发布后自动配图
+
+`/talk-html --image`（也接受 `配图` 字样）在正常路由 + 渲染 + 发布之后多走一步：
+把刚发布的公开页面链接喂给 ChatGPT，自动生成一组配图，嵌回页面再重新发布、打开。
+
+机制全部写在 `skills/talk-html/SKILL.md` 的「`--image` 模式」一节，复用本插件自带的
+`skills/gpt-image/`（生成+下载）与 `skills/browse/`（驱动 chatgpt.com）。三条铁律：
+**开新对话 · 只发一句带公开链接的 prompt（`帮我生成一组配图：<url>`）· 下载全部**。
+配图是增强而非发布前置闸门——失败时保留无图版本，绝不手绘/伪造替代图。
 
 ```
                         /talk-html  (router)

@@ -911,3 +911,46 @@ cd ~/.agents/talk-html/_gallery && bun verify.ts           # judge harness → J
 11. The evidence rule is **mechanical, not advisory** (§3.1.3). Before publish / before declaring the page done, `verify-evidence.sh` must pass: a page that embeds a motion artifact carries checkable provenance (inline `talk-html-evidence` record, a co-located `run-log.json`, or a *declared* `data-evidence="unrecorded"` gap), or it is provably static. `publish.sh` enforces the same gate as a fail-closed precondition. A failing gate is a §3.1.1 ④ block — never a reason to weaken the gate, and never a publish. This exists because a 36-clip human ground truth proved a pixel/motion proxy agrees with reality only ~half the time and never rejects fakes; provenance is the only signal that holds. Static pages (essay / letter / recap with no motion artifact) pass untouched.
 12. Eval / bad-case / Gate Rule pages obey §3.1.4. If the user asks for videos, playable videos, or attached videos, the page includes real `<video controls>` elements for the relevant failed cases or rule groups. Screenshots, posters, contact sheets, and static tables are supporting material only; they do not satisfy the video request. The mapping from `#Gate Rule {index}` to failed cases and related videos is visible, provenance is checkable, and playability is verified before publish.
 13. Pages whose subject is a concrete change or deliverable consult the §3.2.1 matrices. From `~/.agents/skills/talk-html/references/proof-matrix.csv`: the embedded proof matches the artifact's owed `visual_proof_type` rendered in its `recommended_view`, the page is structured for the `role_that_MUST_see_it` with `why_they_need_it` as the proof-chain caption, and GIF/MP4/recording rows are treated as non-static under §3.1/§3.1.4. From `~/.agents/skills/talk-html/references/proof-build-eval-matrix.csv`: the proof is built with the project's own entrypoint where one exists (`build_tools` are candidates, never a license to reinvent build logic — §3.1 / §3.1.1 ②), its `deterministic_gate` is decided by the listed `programmatic_evaluation_tools`' own machine output (not self-judged by author/agent/artifact — the §3.1.3 / third-party-judge rule per artifact), and the `ci_output` is embedded or linked with §3.0.1 provenance, not a screenshot of a green check. Both are a floor on *specificity*; neither relaxes §3.0.1 or the §3.1.3 evidence gate, and Mermaid/PlantUML `build_tools` mean render-to-static-SVG, never a live JS block (Quality bar #4). The same obligation is shipped pre-joined as `~/.agents/skills/talk-html/references/proof-matrix-merged.csv` (one row per artifact_type × reviewer, all ten columns) for a single lookup — it is a deterministic join of the two component files, so maintain the components and never hand-edit the merge. Pure static communication (essay / letter / recap) with no reported artifact is exempt.
+
+---
+
+## `--image` 模式 — 给页面自动配图（bundled gpt-image + browse）
+
+`/talk-html --image` 在正常渲染 + 发布之后，**多走一步**：让 ChatGPT 读取刚发布的公开页面、自动生成一组配图，嵌回页面再重新发布。它复用本插件**自带**的两个 skill：
+
+- `${CLAUDE_PLUGIN_ROOT}/skills/gpt-image/` — 驱动已登录的 ChatGPT 生成并下载图片。
+- `${CLAUDE_PLUGIN_ROOT}/skills/browse/` — 通过 gstack browse daemon 访问 `chatgpt.com`。
+  二进制不随仓库分发（见根 `.gitignore` 的 `dist/`）；运行时用系统已装的
+  `$BROWSE_BIN`（默认 `~/.claude/skills/gstack/browse/dist/browse`），或在
+  `install.sh` 里 `bun run build` 现场编译。
+
+### 为什么是「发布后再配图」而不是「先配图」
+
+配图依赖 ChatGPT **读到这一页**。所以必须先有公开 URL（`publish.sh` 产出的
+`rendered:` / `raw:`），再把链接喂给 ChatGPT。本地 `file://` 它看不到。
+
+### 固定流程（严格遵守 gpt-image 的四条铁律）
+
+1. **正常出页**：按本 SKILL 完整流程渲染 → `verify-evidence.sh` → `publish.sh`，
+   拿到公开 `raw:` URL。
+2. **配图**（调 bundled gpt-image，契约见其 SKILL.md）：
+   - 永远**开新对话**（fresh chat）；永远走 **browse**；
+   - prompt 只有一句、只带链接：`帮我生成一组配图：<raw URL>`，
+     **不要**写任何画面/风格/构图描述——页面自己已经携带主题与调性；
+   - 等生成结束，用 `bin/download-all-images.sh "<out_dir>" <tab-id>` **下载全部**。
+3. **嵌回 + 重发**：把图降采样后以 `data:` URI 内联（确保 gist 可见），插入页面，
+   重新跑 `verify-evidence.sh`（静态图片 → PASS）、`publish.sh`，`open` rendered URL。
+
+### 已知特性（照实告诉用户，不要粉饰）
+
+- ChatGPT 对「一组配图」常常只回**一张综合信息图**（其图片工具一轮一张），且
+  中文字形可能糊——这是图像模型对 CJK 的固有弱点，不是 bug。要多张干净无字插画
+  是另一种 brief，需用户另行指定。
+- 嵌入真实图片会让单页超过 200KB 体积建议线——这是合理例外（Quality bar #5），
+  在页面里注明体积即可。
+
+### 失败降级
+
+配图失败（未登录 / daemon 不健康 / 没生成）时，**不要**伪造或手绘替代图：保留已
+发布的无图版本，按 gpt-image 的 failure-modes 表排查并如实告诉用户哪一步断了。
+配图是页面的**增强**，不是发布的前置闸门——无图版本本身已是合格交付物。
