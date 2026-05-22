@@ -31,10 +31,12 @@ Four rules, each there because the alternative already failed in practice:
 4. **Download them all.** A "组" (a set) means several images. Pull every one,
    in order, with the bundled `download-all-images.sh`.
 
-Plus one model rule, just as load-bearing: **always switch to the advanced
-"Thinking" model before sending** (Step 1.5). The default Instant model does
-not reliably browse the link — it hallucinates from the URL — so the link-only
-contract only works on the model that actually reads the page.
+Plus one model rule, just as load-bearing: **switch to the advanced "Thinking"
+model (Step 1.5) and then prove it took (Step 1.6) before sending.** The default
+Instant model does not reliably browse the link — it hallucinates from the URL —
+so the link-only contract only works on the model that actually reads the page.
+The switch can silently no-op, so the run is gated on reading the model label
+back: confirmed Thinking/advanced → proceed; Instant or unconfirmed → stop.
 
 If the user hands you a local file path instead of a public link, publish it
 first (talk-html's `publish.sh` returns a `rendered:` URL) and pass *that* — a
@@ -105,6 +107,45 @@ to **manually flip the model to the advanced "Thinking" mode** in the shared
 browser, then continue. Selectors drift; if the JS above returns
 `NO-SWITCHER` / `NO-THINKING-ITEM`, snapshot the top bar
 (`"$B" snapshot -i | head -30`) to find the current control before retrying.
+
+## Step 1.6 — Double-check the model (fail-closed gate, run every time)
+
+Step 1.5 *attempts* the switch; this step *proves* it took. They are different
+jobs: a click can silently no-op (menu didn't open, label localized
+differently, account downgraded mid-session), and the failure is invisible —
+you only find out when the image comes back off-topic. So before sending the
+prompt, **read the model label back and gate on it**. This is the load-bearing
+check the user asked for: positively confirm the active model **says
+Thinking/advanced** and **does not say Instant/即时**. Anything else stops the
+run — never "probably fine".
+
+```bash
+"$B" tab <id>
+LABEL="$("$B" js 'var h=document.querySelector("[data-testid=\"model-switcher-dropdown-button\"]")||[...document.querySelectorAll("button")].find(x=>/instant|thinking|即时|思考|gpt-5/i.test((x.getAttribute("aria-label")||"")+x.textContent)); h?(h.getAttribute("aria-label")||h.textContent).trim():"NO-LABEL"' 2>/dev/null | tr -d '\r\n')"
+echo "active model label: [$LABEL]"
+# Fail-closed verdict: must be advanced/Thinking AND must NOT be Instant.
+printf '%s' "$LABEL" | grep -Eqi 'thinking|advanced|思考|高级|pro' \
+  && ! printf '%s' "$LABEL" | grep -Eqi 'instant|即时|fast' \
+  && [ "$LABEL" != "NO-LABEL" ] \
+  && echo "GATE: PASS — advanced/Thinking confirmed, proceeding" \
+  || echo "GATE: FAIL — model is Instant or unconfirmed; STOP, do not send the prompt"
+```
+
+Read the verdict, do not assume it:
+
+- **`GATE: PASS`** — the label affirmatively shows Thinking/advanced and has no
+  Instant marker. Only now continue to Step 2.
+- **`GATE: FAIL`** (label is `Instant`/`即时`, empty, `NO-LABEL`, or anything you
+  can't positively read as advanced) — **do not send the prompt.** Re-run the
+  Step 1.5 switch once; if it still fails, stop and tell the user to **manually
+  set the model to advanced "Thinking"** in the shared browser, then resume.
+  Sending on an unconfirmed model is the exact failure this skill exists to
+  prevent — an Instant run that looks fine and ships an off-topic image.
+
+Why fail-closed (refuse on doubt) rather than fail-open (proceed and hope): a
+false "looks ok" here is silent and expensive — it costs a full generate +
+download + embed cycle before anyone notices the image is wrong. A hard stop is
+cheap and obvious. When the label is ambiguous, treat it as FAIL.
 
 ## Step 2 — Send the one-sentence prompt
 
